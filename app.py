@@ -2,42 +2,97 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Load model and scaler
+# -----------------------------
+# Page Configuration
+# -----------------------------
+st.set_page_config(
+    page_title="Customer Churn Prediction",
+    page_icon="📊",
+    layout="wide"
+)
+
+st.title("Customer Churn Prediction Dashboard")
+
+st.write(
+    "This application predicts whether a telecom customer is likely to churn "
+    "based on account and service information."
+)
+
+# -----------------------------
+# Load Model & Scaler
+# -----------------------------
 model = joblib.load("models/churn_model.pkl")
 scaler = joblib.load("models/scaler.pkl")
 
-st.set_page_config(page_title="Customer Churn Prediction", layout="centered")
+# -----------------------------
+# User Input Section
+# -----------------------------
+st.sidebar.header("Customer Information")
 
-st.title("📊 Customer Churn Prediction App")
-st.write("Enter customer details below to predict whether the customer will churn.")
+tenure = st.sidebar.slider("Tenure (Months)", 0, 72, 12)
+monthly_charges = st.sidebar.number_input("Monthly Charges", 0.0, 200.0, 70.0)
+total_charges = st.sidebar.number_input("Total Charges", 0.0, 10000.0, 2000.0)
 
-# User Inputs
-gender = st.selectbox("Gender", ["Male", "Female"])
-SeniorCitizen = st.selectbox("Senior Citizen", [0, 1])
-Partner = st.selectbox("Partner", ["Yes", "No"])
-Dependents = st.selectbox("Dependents", ["Yes", "No"])
-tenure = st.slider("Tenure (Months)", 0, 72, 12)
-MonthlyCharges = st.number_input("Monthly Charges", min_value=0.0, value=50.0)
-TotalCharges = st.number_input("Total Charges", min_value=0.0, value=500.0)
+contract = st.sidebar.selectbox(
+    "Contract Type",
+    ["Month-to-month", "One year", "Two year"]
+)
 
-# Convert Inputs into DataFrame
-input_data = pd.DataFrame({
-    "SeniorCitizen": [SeniorCitizen],
-    "tenure": [tenure],
-    "MonthlyCharges": [MonthlyCharges],
-    "TotalCharges": [TotalCharges],
-    "gender_Male": [1 if gender == "Male" else 0],
-    "Partner_Yes": [1 if Partner == "Yes" else 0],
-    "Dependents_Yes": [1 if Dependents == "Yes" else 0],
-})
+internet_service = st.sidebar.selectbox(
+    "Internet Service",
+    ["DSL", "Fiber optic", "No"]
+)
 
-# Ensure correct scaling
-scaled_data = scaler.transform(input_data)
+device_protection = st.sidebar.selectbox(
+    "Device Protection",
+    ["No", "Yes", "No internet service"]
+)
 
+# -----------------------------
+# Create Input Data
+# -----------------------------
+input_data = {
+    "tenure": tenure,
+    "MonthlyCharges": monthly_charges,
+    "TotalCharges": total_charges,
+    "Contract": contract,
+    "InternetService": internet_service,
+    "DeviceProtection": device_protection
+}
+
+input_df = pd.DataFrame([input_data])
+
+# -----------------------------
+# Preprocessing
+# -----------------------------
+# One-hot encoding
+input_df = pd.get_dummies(input_df)
+
+# Align columns with training data
+input_df = input_df.reindex(columns=scaler.feature_names_in_, fill_value=0)
+
+# Scaling
+scaled_data = scaler.transform(input_df)
+
+# -----------------------------
+# Prediction
+# -----------------------------
 if st.button("Predict Churn"):
-    prediction = model.predict(scaled_data)
 
-    if prediction[0] == 1:
-        st.error("⚠️ Customer is likely to CHURN!")
+    prediction = model.predict(scaled_data)[0]
+    probability = model.predict_proba(scaled_data)[0][1]
+
+    st.subheader("Prediction Result")
+
+    if prediction == 1:
+        st.error(f"⚠️ Customer is likely to churn")
     else:
-        st.success("✅ Customer is likely to STAY!")
+        st.success(f"✅ Customer is likely to stay")
+
+    st.write(f"Churn Probability: **{probability:.2f}**")
+
+# -----------------------------
+# Footer
+# -----------------------------
+st.markdown("---")
+st.markdown("Developed by **Zohib Khan**")
